@@ -7,7 +7,12 @@ resource "aws_sqs_queue" "trello_webhook_queue" {
   max_message_size           = 262144
   message_retention_seconds  = 345600
   receive_wait_time_seconds  = 0
-  visibility_timeout_seconds = 30
+  visibility_timeout_seconds = 360
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.trello_webhook_dlq.arn
+    maxReceiveCount     = 3
+  })
 
   tags = {
     Name        = "${var.environment}-trello-webhook-queue"
@@ -105,10 +110,16 @@ resource "aws_iam_role_policy" "lambda_sqs_policy" {
 }
 
 resource "aws_lambda_event_source_mapping" "sqs_trigger" {
-  event_source_arn = aws_sqs_queue.trello_webhook_queue.arn
-  function_name    = aws_lambda_function.trello_webhook_processor.arn
-  batch_size       = var.sqs_batch_size
-  enabled          = true
+  event_source_arn                   = aws_sqs_queue.trello_webhook_queue.arn
+  function_name                      = aws_lambda_function.trello_webhook_processor.arn
+  batch_size                         = var.sqs_batch_size
+  enabled                            = true
+  function_response_types            = ["ReportBatchItemFailures"]
+  maximum_batching_window_in_seconds = 0
+
+  scaling_config {
+    maximum_concurrency = 10
+  }
 }
 
 resource "aws_api_gateway_rest_api" "trello_webhook_api" {
