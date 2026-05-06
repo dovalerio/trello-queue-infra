@@ -12,6 +12,11 @@ variable "message_retention_seconds" {
   default = 345600
 }
 
+variable "max_receive_count" {
+  type    = number
+  default = 3
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
